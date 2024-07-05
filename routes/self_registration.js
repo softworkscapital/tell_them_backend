@@ -110,6 +110,7 @@ registrationRouter.put('/updatestatus/:id', async (req, res, next) => {
         res.sendStatus(500);
     }
 });
+
 //Update Documents
 registrationRouter.put('/uploaddocs/:id/:email', async (req, res, next) => {
     try {

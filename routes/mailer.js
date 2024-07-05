@@ -48,4 +48,19 @@ mailerRouter.post('/appform', async (req, res, next) => {
     }
 });
 
+mailerRouter.post('/apikey', async (req, res, next) => {
+    let postedValues = req.body;
+    let username = postedValues.username;
+    let user_email = postedValues.user_email;
+    let apikey = postedValues.apikey;
+    
+    try {
+        let results = await mailerDbOperations.sendApiEmail(username, user_email, apikey );
+        res.json(results);
+    } catch (e) {
+        console.log(e);
+        res.sendStatus(500);
+    }
+});
+
 module.exports = mailerRouter;

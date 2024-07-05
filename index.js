@@ -13,6 +13,8 @@ const { simpleParser } = require('mailparser');
 const path = require('path');
 const fs = require('fs');
 
+const pool = require('./cruds/poolapi');
+
 // Route path
 const userRouter = require('./routes/users');
 const clientRouter = require('./routes/client_profile');
@@ -23,11 +25,11 @@ const topUpRouter = require('./routes/topUp');
 const contactGroupsRouter = require('./routes/contact_groups');
 const registrationRouter = require('./routes/self_registration');
 const mailerRouter = require('./routes/mailer');
+const sendersRouter = require('./routes/sender_id');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
-
 
 //App Route Usage
 app.use('/users', userRouter);
@@ -39,6 +41,7 @@ app.use('/topUp', topUpRouter);
 app.use('/contactgroups', contactGroupsRouter);
 app.use('/selftregistration', registrationRouter);
 app.use('/mailer', mailerRouter);
+app.use('/senderid', sendersRouter);
 
 //SMS ENDPOINT
 app.get('/client/api/sendmessage/', async (req, res) => {
@@ -108,13 +111,13 @@ app.get('/sendemail', (req, res) => {
   res.send(sendEmailAndAppend());
 });
 
-
 // Send message
 app.post('/sendSMS', (req, res) => {
-  const { dest_phone, msgbody } = req.body;
+  const { dest_phone, msgbody, selectedCategory } = req.body;
+  console.log('sender ID: ', selectedCategory);
 
   // const originalUrl = `http://196.43.100.209:8901/teleoss/sendsms.jsp?user=Softwork&password=Soft@012&mobiles=${dest_phone}&sms=${msgbody}&unicode=1&clientsmsid=10001&senderid=Softwork`;
-  const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${msgbody}&senderid=softworks`;
+  const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${msgbody}&senderid=${selectedCategory}`;
 
   axios.get(originalUrl)
     .then(() => {
@@ -125,137 +128,105 @@ app.post('/sendSMS', (req, res) => {
     });
 });
 
-// app.post('/smsendpoint', (req, res) => {
-//   const { clientid, clientkey, message, recipients } = req.body;
+app.post('/smsendpoint', (req, res) => {
+  const { clientid, clientkey, message, recipients } = req.body;
 
-//   axios
-//     .get(`http://localhost:3003/clients/api/${clientid}/${clientkey}`)
-//     .then((response) => {
-//       const clientData = response.data;
+  axios
+    .get(`${pool}/clients/api/${clientid}/${clientkey}`)
+    .then((response) => {
+      const clientData = response.data;
 
-//       if (!clientData || clientData.length === 0) {
-//         return res.status(400).json({ error: 'Invalid clientid or clientkey' });
-//       }
+      if (!clientData || clientData.length === 0) {
+        return res.status(400).json({ error: 'Invalid clientid or clientkey' });
+      }
 
-//       axios
-//         .get(`http://localhost:3003/lasttopup/${clientid}`)
-//         .then((balanceResponse) => {
-//           const balanceData = balanceResponse.data;
+      axios
+        .get(`${pool}/topup/lasttopup/${clientid}`)
+        .then((balanceResponse) => {
+          const balanceData = balanceResponse.data;
 
-//           if (!balanceData || balanceData.results.length === 0) {
-//             return res.status(400).json({ error: 'Could not retrieve client balance' });
-//           }
+          if (!balanceData || balanceData.results.length === 0) {
+            return res.status(400).json({ error: 'Could not retrieve client balance' });
+          }
 
-//           const balance = balanceData.results[0].balance;
-//           const totalCost = recipients.length * 0.046;
+          const balance = balanceData.results[0].balance;
+          const totalCost = recipients.length * 0.046;
 
-//           if (balance < totalCost) {
-//             return res.status(400).json({ error: 'Insufficient balance' });
-//           }
+          if (balance < totalCost) {
+            return res.status(400).json({ error: 'Insufficient balance' });
+          }
 
-//           // Proceed with sending SMS or any other operations
-//           const dest_phone = recipients.join(',');
-//           const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=softworks`;
+          const currentDate = new Date().toISOString();
+          const postData = {
+            client_profile_id: clientid,
+            message_type: "SMS",
+            origin_phone: "YourOriginPhone",
+            arr: recipients,
+            date_sent: currentDate,
+            group_id: "",
+            contact_grouping_id: "",
+            msgbody: message,
+            currency: "USD",
+            exchange_rate: 1,
+            credit: 0.046,
+            debit: 0,
+            balance: 0,
+            description: "SMS sending",
+            vat: 0.15,
+            costIncl: 0.046
+          };
 
-//           axios
-//             .get(originalUrl)
-//             .then(() => {
-//               // Prepare data for the /sentmessages endpoint
-//               const currentDate = new Date().toISOString();
-//               const postData = {
-//                 "client_profile_id": clientid,
-//                 "message_type": "SMS",
-//                 "origin_phone": "YourOriginPhone",
-//                 "arr": recipients,
-//                 "date_sent": currentDate,
-//                 "group_id": "",
-//                 "contact_grouping_id": "",
-//                 "msgbody": message,
-//                 "currency": "USD",
-//                 "exchange_rate": 1,
-//                 "credit": 0.046,
-//                 "debit": 0,
-//                 "balance": 0,
-//                 "description": "SMS sending",
-//                 "vat": 0.15,
-//                 "costIncl": 0.046
-//               };
+          axios
+            .post(`${pool}/sentmessages`, {
+              "client_profile_id": clientid,
+              "message_type": "SMS",
+              "origin_phone": "Sent by Api",
+              "arr": recipients,
+              "date_sent": currentDate,
+              "group_id": "",
+              "contact_grouping_id": "",
+              "msgbody": message,
+              "currency": "USD",
+              "exchange_rate": 1,
+              "credit": 0.046,
+              "debit": 0,
+              "balance": 0,
+              "description": "SMS sending",
+              "vat": 0.15,
+              "costIncl": 0.046
+            }, {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            })
+            .then(response => {
+              console.log('Response:', response.data);
+            })
+            .catch(error => {
+              console.error('Error:', error);
+            });
 
-//               // Hit the /sentmessages endpoint with the data
-//               axios
-//                 .post('http://localhost:3003/sentmessages', postData, {
-//                   headers: { 'Content-Type': 'application/json' },
-//                 })
-//                 .then(() => {
-//                   res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
-//                 })
-//                 .catch((error) => {
-//                   res.status(500).json({ error: error.message });
-//                 });
-//             })
-//             .catch((error) => {
-//               res.status(500).json({ error: error.message });
-//             });
-//         })
-//         .catch((error) => {
-//           res.status(500).json({ error: error.message });
-//         });
-//     })
-//     .catch((error) => {
-//       res.status(500).json({ error: error.message });
-//     });
-// });
+          // Proceed with sending SMS or any other operations
+          const dest_phone = recipients.join(',');
+          const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=softworks`;
 
-
-// app.post('/smsendpoint', (req, res) => {
-//   const { clientid, clientkey, message, recipients } = req.body;
-
-//   axios
-//     .get(`http://localhost:3003/clients/api/${clientid}/${clientkey}`)
-//     .then((response) => {
-//       const clientData = response.data;
-
-//       if (!clientData || clientData.length === 0) {
-//         return res.status(400).json({ error: 'Invalid clientid or clientkey' });
-//       }
-
-//       axios
-//         .get(`http://localhost:3003/topup/lasttopup/${clientid}`)
-//         .then((balanceResponse) => {
-//           const balanceData = balanceResponse.data;
-
-//           if (!balanceData || balanceData.results.length === 0) {
-//             return res.status(400).json({ error: 'Could not retrieve client balance' });
-//           }
-
-//           const balance = balanceData.results[0].balance;
-//           const totalCost = recipients.length * 0.046;
-
-//           if (balance < totalCost) {
-//             return res.status(400).json({ error: 'Insufficient balance' });
-//           }
-
-//           // Proceed with sending SMS or any other operations
-//           const dest_phone = recipients.join(',');
-//           const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=softworks`;
-
-//           axios
-//             .get(originalUrl)
-//             .then(() => {
-//               res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
-//             })
-//             .catch((error) => {
-//               res.status(500).json({ error: error.message });
-//             });
-//         })
-//         .catch((error) => {
-//           res.status(500).json({ error: error.message });
-//         });
-//     })
-//     .catch((error) => {
-//       res.status(500).json({ error: error.message });
-//     });
-// });
+          axios
+            .get(originalUrl)
+            .then(() => {
+              res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
+            })
+            .catch((error) => {
+              res.status(500).json({ error: error.message });
+            });
+        })
+        .catch((error) => {
+          res.status(500).json({ error: error.message });
+        });
+    })
+    .catch((error) => {
+      res.status(500).json({ error: error.message });
+    });
+});
 
 
 const options = {
