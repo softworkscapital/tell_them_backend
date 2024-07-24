@@ -188,8 +188,24 @@ crudsObj.sendEmailAndAppend2 = (company_name, address, phoneno1, phoneno2, compa
 }
 
 crudsObj.sendApiEmail = (username, user_email, apikey) => {
-    return new Promise((resolve, reject) => {
-        const body = `<h2 style='color: blue;'> Tell Them Message Service  </h2> <p style = ' color: #000000; margin-top: 33px;'> Good Day ${username}.</p> Your API key has been successfully configured. \n  Your API key is: <b>${apikey}</b> </p><p style = ' margin-top: 25px'><b>Regards</b><br></br><b>Softworks Team</b><br></br>0773406449, 0777304942<br></br> www.softworkscapital.com <br/> Bonvyx Company Pvt Ltd t/a softworks <br/>30 Samora Machel Avenue<br></br>Harare CBD<br></br></p><p style = 'color: #1fc600'><em>We are Your Technology Partner for Digital Success.</em></p>`;
+    return new Promise(async (resolve, reject) => {
+        const body = `<h2 style='color: blue;'> Tell Them Message Service  </h2> 
+                      <p style='color: #000000; margin-top: 33px;'> 
+                      Good Day ${username}.</p> 
+                      Your API key has been successfully configured. 
+                      Your API key is: <b>${apikey}</b> 
+                      </p>
+                      <p style='margin-top: 25px'>
+                      <b>Regards</b><br />
+                      <b>Softworks Team</b><br />
+                      0773406449, 0777304942<br />
+                      www.softworkscapital.com <br /> 
+                      Bonvyx Company Pvt Ltd t/a softworks <br />
+                      30 Samora Machel Avenue<br />
+                      Harare CBD<br />
+                      </p>
+                      <p style='color: #1fc600'>
+                      <em>We are Your Technology Partner for Digital Success.</em></p>`;
 
         try {
             // Create a nodemailer transporter using SMTP
@@ -210,10 +226,8 @@ crudsObj.sendApiEmail = (username, user_email, apikey) => {
                 html: body,
             };
 
-
             // Send the email
-            const info = transporter.sendMail(mailOptions);
-
+            const info = await transporter.sendMail(mailOptions);
             console.log('Email sent successfully.');
             console.log('Info object:', info);
 
@@ -232,7 +246,6 @@ crudsObj.sendApiEmail = (username, user_email, apikey) => {
                         console.error('Error opening "Sent" folder:', err);
                         imap.end();
                         return reject(err);
-                        return;
                     }
 
                     // Create the email message as MIMEText
@@ -242,30 +255,27 @@ crudsObj.sendApiEmail = (username, user_email, apikey) => {
                     imap.append(emailMessage, { mailbox: 'Sent' }, (appendErr) => {
                         if (appendErr) {
                             console.error('Error appending email to "Sent" folder:', appendErr);
-                            return reject(err);
+                            return reject(appendErr);
                         } else {
                             console.log('Email appended to "Sent" folder.');
                             resolve({ status: '200', message: 'sent successfully' });
                             imap.end();
-                            return
                         }
-                        imap.end();
                     });
                 });
             });
 
             imap.once('error', (imapErr) => {
                 console.error('IMAP Error:', imapErr);
-                return reject(err);
+                return reject(imapErr);
             });
 
             imap.connect();
         } catch (error) {
             console.error('Error sending email:', error);
-            return reject(err);
+            return reject(error);
         }
     });
 }
-
 
 module.exports = crudsObj;

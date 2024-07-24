@@ -129,103 +129,95 @@ app.post('/sendSMS', (req, res) => {
 });
 
 app.post('/smsendpoint', (req, res) => {
-  const { clientid, clientkey, message, recipients } = req.body;
+  const { clientid, clientkey, message, recipients, senderid } = req.body;
 
+  // Check client ID and key
   axios
-    .get(`${pool}/clients/api/${clientid}/${clientkey}`)
-    .then((response) => {
-      const clientData = response.data;
+      .get(`${pool}/clients/api/${clientid}/${clientkey}`)
+      .then((response) => {
+          const clientData = response.data;
 
-      if (!clientData || clientData.length === 0) {
-        return res.status(400).json({ error: 'Invalid clientid or clientkey' });
-      }
+          if (!clientData || clientData.length === 0) {
+              return res.status(400).json({ error: 'Invalid clientid or clientkey' });
+          }
 
-      axios
-        .get(`${pool}/topup/lasttopup/${clientid}`)
-        .then((balanceResponse) => {
+          // Validate sender ID
+          return fetch(`${pool}/senderid/${clientid}`)
+              .then(res => res.json())
+              .then(resp => {
+                  console.log("Sender ID response:", resp);
+                  // Check if senderid is valid
+                  const validSenderIds = resp.map(item => item.sender_name);
+                  if (!validSenderIds.includes(senderid)) {
+                      return res.status(400).json({ error: 'Invalid senderid' });
+                  }
+
+                  // Proceed to check balance
+                  return axios.get(`${pool}/topup/lasttopup/${clientid}`);
+              });
+      })
+      .then(balanceResponse => {
           const balanceData = balanceResponse.data;
 
           if (!balanceData || balanceData.results.length === 0) {
-            return res.status(400).json({ error: 'Could not retrieve client balance' });
+              return res.status(400).json({ error: 'Could not retrieve client balance' });
           }
 
           const balance = balanceData.results[0].balance;
           const totalCost = recipients.length * 0.046;
 
           if (balance < totalCost) {
-            return res.status(400).json({ error: 'Insufficient balance' });
+              return res.status(400).json({ error: 'Insufficient balance' });
           }
 
           const currentDate = new Date().toISOString();
           const postData = {
-            client_profile_id: clientid,
-            message_type: "SMS",
-            origin_phone: "YourOriginPhone",
-            arr: recipients,
-            date_sent: currentDate,
-            group_id: "",
-            contact_grouping_id: "",
-            msgbody: message,
-            currency: "USD",
-            exchange_rate: 1,
-            credit: 0.046,
-            debit: 0,
-            balance: 0,
-            description: "SMS sending",
-            vat: 0.15,
-            costIncl: 0.046
+              client_profile_id: clientid,
+              message_type: "SMS",
+              origin_phone: "YourOriginPhone",
+              arr: recipients,
+              date_sent: currentDate,
+              group_id: "",
+              contact_grouping_id: "",
+              msgbody: message,
+              currency: "USD",
+              exchange_rate: 1,
+              credit: 0.046,
+              debit: 0,
+              balance: 0,
+              description: "SMS sending",
+              vat: 0.15,
+              costIncl: 0.046
           };
 
-          axios
-            .post(`${pool}/sentmessages`, {
-              "client_profile_id": clientid,
-              "message_type": "SMS",
-              "origin_phone": "Sent by Api",
-              "arr": recipients,
-              "date_sent": currentDate,
-              "group_id": "",
-              "contact_grouping_id": "",
-              "msgbody": message,
-              "currency": "USD",
-              "exchange_rate": 1,
-              "credit": 0.046,
-              "debit": 0,
-              "balance": 0,
-              "description": "SMS sending",
-              "vat": 0.15,
-              "costIncl": 0.046
-            }, {
+          // Log sent message data
+          console.log('Post data for sent messages:', postData);
+
+          return axios.post(`${pool}/sentmessages`, postData, {
               headers: {
-                'Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
               },
-            })
-            .then(response => {
-              console.log('Response:', response.data);
-            })
-            .catch(error => {
-              console.error('Error:', error);
-            });
-
-          // Proceed with sending SMS or any other operations
+          });
+      })
+      .then(response => {
+          console.log('Response from sent messages:', response.data);
+          
+          // Proceed with sending SMS
           const dest_phone = recipients.join(',');
-          const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=softworks`;
+          const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=${senderid}`;
 
-          axios
-            .get(originalUrl)
-            .then(() => {
-              res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
-            })
-            .catch((error) => {
+          return axios.get(originalUrl);
+      })
+      .then(() => {
+          res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
+      })
+      .catch(error => {
+          // Handle any errors that occur in the promise chain
+          console.error('Error:', error.message);
+          if (!res.headersSent) {
               res.status(500).json({ error: error.message });
-            });
-        })
-        .catch((error) => {
-          res.status(500).json({ error: error.message });
-        });
-    })
-    .catch((error) => {
-      res.status(500).json({ error: error.message });
-    });
+          }
+      });
 });
 
 
