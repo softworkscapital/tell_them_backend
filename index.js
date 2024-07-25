@@ -3,6 +3,8 @@ require('dotenv').config();
 const cors = require('cors');
 const https = require('https');
 
+const authenticateToken = require('./utilities/authenticateToken');
+
 const multer = require('multer');
 const axios = require('axios');
 
@@ -33,15 +35,15 @@ app.use(cors());
 
 //App Route Usage
 app.use('/users', userRouter);
-app.use('/clients', clientRouter);
-app.use('/groups', groupsRouter);
-app.use('/contacts', contactRouter);
-app.use('/sentmessages', sentMessagesRouter);
-app.use('/topUp', topUpRouter);
-app.use('/contactgroups', contactGroupsRouter);
+app.use('/clients', clientRouter); //authenticateToken, Checked
+app.use('/groups', authenticateToken, groupsRouter);
+app.use('/contacts', authenticateToken, contactRouter);
+app.use('/sentmessages',  sentMessagesRouter); //authenticateToken,
+app.use('/topUp',  topUpRouter); //authenticateToken,
+app.use('/contactgroups', authenticateToken, contactGroupsRouter);
 app.use('/selftregistration', registrationRouter);
 app.use('/mailer', mailerRouter);
-app.use('/senderid', sendersRouter);
+app.use('/senderid', sendersRouter); //authenticateToken,
 
 //SMS ENDPOINT
 app.get('/client/api/sendmessage/', async (req, res) => {
@@ -112,7 +114,7 @@ app.get('/sendemail', (req, res) => {
 });
 
 // Send message
-app.post('/sendSMS', (req, res) => {
+app.post('/sendSMS', authenticateToken, (req, res) => {
   const { dest_phone, msgbody, selectedCategory } = req.body;
   console.log('sender ID: ', selectedCategory);
 
@@ -133,91 +135,91 @@ app.post('/smsendpoint', (req, res) => {
 
   // Check client ID and key
   axios
-      .get(`${pool}/clients/api/${clientid}/${clientkey}`)
-      .then((response) => {
-          const clientData = response.data;
+    .get(`${pool}/clients/api/${clientid}/${clientkey}`)
+    .then((response) => {
+      const clientData = response.data;
 
-          if (!clientData || clientData.length === 0) {
-              return res.status(400).json({ error: 'Invalid clientid or clientkey' });
+      if (!clientData || clientData.length === 0) {
+        return res.status(400).json({ error: 'Invalid clientid or clientkey' });
+      }
+
+      // Validate sender ID
+      return fetch(`${pool}/senderid/${clientid}`)
+        .then(res => res.json())
+        .then(resp => {
+          console.log("Sender ID response:", resp);
+          // Check if senderid is valid
+          const validSenderIds = resp.map(item => item.sender_name);
+          if (!validSenderIds.includes(senderid)) {
+            return res.status(400).json({ error: 'Invalid senderid' });
           }
 
-          // Validate sender ID
-          return fetch(`${pool}/senderid/${clientid}`)
-              .then(res => res.json())
-              .then(resp => {
-                  console.log("Sender ID response:", resp);
-                  // Check if senderid is valid
-                  const validSenderIds = resp.map(item => item.sender_name);
-                  if (!validSenderIds.includes(senderid)) {
-                      return res.status(400).json({ error: 'Invalid senderid' });
-                  }
+          // Proceed to check balance
+          return axios.get(`${pool}/topup/lasttopup/${clientid}`);
+        });
+    })
+    .then(balanceResponse => {
+      const balanceData = balanceResponse.data;
 
-                  // Proceed to check balance
-                  return axios.get(`${pool}/topup/lasttopup/${clientid}`);
-              });
-      })
-      .then(balanceResponse => {
-          const balanceData = balanceResponse.data;
+      if (!balanceData || balanceData.results.length === 0) {
+        return res.status(400).json({ error: 'Could not retrieve client balance' });
+      }
 
-          if (!balanceData || balanceData.results.length === 0) {
-              return res.status(400).json({ error: 'Could not retrieve client balance' });
-          }
+      const balance = balanceData.results[0].balance;
+      const totalCost = recipients.length * 0.046;
 
-          const balance = balanceData.results[0].balance;
-          const totalCost = recipients.length * 0.046;
+      if (balance < totalCost) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
 
-          if (balance < totalCost) {
-              return res.status(400).json({ error: 'Insufficient balance' });
-          }
+      const currentDate = new Date().toISOString();
+      const postData = {
+        client_profile_id: clientid,
+        message_type: "SMS",
+        origin_phone: "YourOriginPhone",
+        arr: recipients,
+        date_sent: currentDate,
+        group_id: "",
+        contact_grouping_id: "",
+        msgbody: message,
+        currency: "USD",
+        exchange_rate: 1,
+        credit: 0.046,
+        debit: 0,
+        balance: 0,
+        description: "SMS sending",
+        vat: 0.15,
+        costIncl: 0.046
+      };
 
-          const currentDate = new Date().toISOString();
-          const postData = {
-              client_profile_id: clientid,
-              message_type: "SMS",
-              origin_phone: "YourOriginPhone",
-              arr: recipients,
-              date_sent: currentDate,
-              group_id: "",
-              contact_grouping_id: "",
-              msgbody: message,
-              currency: "USD",
-              exchange_rate: 1,
-              credit: 0.046,
-              debit: 0,
-              balance: 0,
-              description: "SMS sending",
-              vat: 0.15,
-              costIncl: 0.046
-          };
+      // Log sent message data
+      console.log('Post data for sent messages:', postData);
 
-          // Log sent message data
-          console.log('Post data for sent messages:', postData);
-
-          return axios.post(`${pool}/sentmessages`, postData, {
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-          });
-      })
-      .then(response => {
-          console.log('Response from sent messages:', response.data);
-          
-          // Proceed with sending SMS
-          const dest_phone = recipients.join(',');
-          const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=${senderid}`;
-
-          return axios.get(originalUrl);
-      })
-      .then(() => {
-          res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
-      })
-      .catch(error => {
-          // Handle any errors that occur in the promise chain
-          console.error('Error:', error.message);
-          if (!res.headersSent) {
-              res.status(500).json({ error: error.message });
-          }
+      return axios.post(`${pool}/sentmessages`, postData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+    })
+    .then(response => {
+      console.log('Response from sent messages:', response.data);
+
+      // Proceed with sending SMS
+      const dest_phone = recipients.join(',');
+      const originalUrl = `https://sms.vas.co.zw/client/api/sendmessage?apikey=e28bb49ae7204dfe&mobiles=${dest_phone}&sms=${message}&senderid=${senderid}`;
+
+      return axios.get(originalUrl);
+    })
+    .then(() => {
+      res.status(200).json({ status: 'success', message: 'SMS sent successfully' });
+    })
+    .catch(error => {
+      // Handle any errors that occur in the promise chain
+      console.error('Error:', error.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message });
+      }
+    });
 });
 
 

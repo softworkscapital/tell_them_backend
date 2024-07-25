@@ -1,6 +1,8 @@
 const express = require('express');
 const userRouter = express.Router();
 const usersDbOperations = require('../cruds/users');
+const { generateToken, verifyToken } = require('../utilities/jwtUtils');
+const authenticateToken = require('../utilities/authenticateToken'); 
 
 
 userRouter.post('/', async (req, res, next) => {
@@ -18,7 +20,7 @@ userRouter.post('/', async (req, res, next) => {
         let addproperty = postedValues.addproperty;
         let editproperty = postedValues.editproperty;
         let approverequests = postedValues.approverequests;
-        let delivery = postedValues.delivery;
+        let delivery = postedValues.delivery; 
         let status = postedValues.status;
         let employee_id = postedValues.employee_id;
         // let client_profile_id = postedValues.client_profile_id;
@@ -65,7 +67,17 @@ userRouter.post('/client/', async (req, res, next) => {
     }
 })
 
-userRouter.get('/', async (req, res, next) => {
+// userRouter.get('/', async (req, res, next) => {
+//     try {
+//         let results = await usersDbOperations.getUsers();
+//         res.json(results);
+//     } catch (e) {
+//         console.log(e);
+//         res.sendStatus(500);
+//     }
+// });
+
+userRouter.get('/', authenticateToken, async (req, res, next) => {
     try {
         let results = await usersDbOperations.getUsers();
         res.json(results);
@@ -87,12 +99,39 @@ userRouter.get('/:id', async (req, res, next) => {
 });
 
 //Get User By User Credentials
+// userRouter.get('/:email/:password', async (req, res, next) => {
+//     try {
+//         let email = req.params.email;
+//         let password = req.params.password;
+//         let result = await usersDbOperations.getUserByCred(email,password);
+//         res.json(result);
+//         const token = generateToken(result); // Generate JWT token
+//         res.json({ token });
+//         console.log('TOKEN: ',token);
+//     } catch (e) {
+//         console.log(e);
+//         res.sendStatus(500);
+//     }
+// });
+
 userRouter.get('/:email/:password', async (req, res, next) => {
     try {
         let email = req.params.email;
         let password = req.params.password;
-        let result = await usersDbOperations.getUserByCred(email,password);
-        res.json(result);
+
+        // Fetch user by credentials
+        let result = await usersDbOperations.getUserByCred(email, password);
+
+        if (!result) {
+            return res.status(401).send('Invalid credentials');
+        }
+
+        // Generate JWT token
+        const token = generateToken(result); 
+        console.log('TOKEN: ', token);
+
+        // Send user data and token in one response
+        res.json({ result: result, token });
     } catch (e) {
         console.log(e);
         res.sendStatus(500);

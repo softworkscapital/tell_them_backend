@@ -1,10 +1,10 @@
 const express = require('express');
 const topUpRouter = express.Router();
 const topUpsDbOperations = require('../cruds/topUp');
-
+const authenticateToken = require('../utilities/authenticateToken'); 
 
 //get topUps all
-topUpRouter.get('/', async (req, res, next) => {
+topUpRouter.get('/', authenticateToken, async (req, res, next) => {
 
     try {
         let results = await topUpsDbOperations.getTopUp();
@@ -16,7 +16,7 @@ topUpRouter.get('/', async (req, res, next) => {
 })
 
 //get Admin Balance all
-topUpRouter.get('/adminBal', async (req, res, next) => {
+topUpRouter.get('/adminBal', authenticateToken, async (req, res, next) => {
 
     try {
         let results = await topUpsDbOperations.getAdminBlance();
@@ -28,7 +28,7 @@ topUpRouter.get('/adminBal', async (req, res, next) => {
 })
 
 //get topUps by id
-topUpRouter.get('/:top_up_id', async (req, res, next) => {
+topUpRouter.get('/:top_up_id', authenticateToken, async (req, res, next) => {
 
     try {
         let top_up_id = req.params.top_up_id;
@@ -40,7 +40,7 @@ topUpRouter.get('/:top_up_id', async (req, res, next) => {
     }
 })
 //get topUps by client_profile_id
-topUpRouter.get('/topup/:client_profile_id', async (req, res, next) => {
+topUpRouter.get('/topup/:client_profile_id', authenticateToken, async (req, res, next) => {
     try {
         let client_profile_id = req.params.client_profile_id;
         let results = await topUpsDbOperations.getTopUpByClientId(client_profile_id);
@@ -65,7 +65,7 @@ topUpRouter.get('/lasttopup/:client_profile_id', async (req, res, next) => {
 })
 
 //post topUp
-topUpRouter.post('/', async (req, res, next) => {
+topUpRouter.post('/', authenticateToken, async (req, res, next) => {
     try {
         let postedValues = req.body;
         let currency = postedValues.currency;
@@ -91,7 +91,7 @@ topUpRouter.post('/', async (req, res, next) => {
 })
 
 //update topUp by id
-topUpRouter.put('/:id', async (req, res, next) => {
+topUpRouter.put('/:id', authenticateToken, async (req, res, next) => {
     try {
         let top_up_id = req.params.id;
 
@@ -116,7 +116,7 @@ topUpRouter.put('/:id', async (req, res, next) => {
 
 
 //delete topUp by id
-topUpRouter.delete('/:top_up_id', async (req, res, next) => {
+topUpRouter.delete('/:top_up_id', authenticateToken, async (req, res, next) => {
 
     try {
         let top_up_id = req.params.top_up_id;

@@ -1,6 +1,7 @@
 const express = require('express');
 const sentMessagesRouter = express.Router();
 const sentMessagesDbOperations = require('../cruds/sent_messages');
+const authenticateToken = require('../utilities/authenticateToken');
 
 sentMessagesRouter.post('/', async (req, res, next) => {
     try {
@@ -33,7 +34,7 @@ sentMessagesRouter.post('/', async (req, res, next) => {
     }
 })
 
-sentMessagesRouter.get('/', async (req, res, next) => {
+sentMessagesRouter.get('/', authenticateToken,  async (req, res, next) => {
     try {
         let results = await sentMessagesDbOperations.getMessages();
         res.json(results);
@@ -54,7 +55,7 @@ sentMessagesRouter.get('/', async (req, res, next) => {
 //     }
 // });
 
-sentMessagesRouter.get('/:id', async (req, res, next) => {
+sentMessagesRouter.get('/:id', authenticateToken,  async (req, res, next) => {
     try {
         let id = req.params.id;
         let result = await sentMessagesDbOperations.getMessageById(id);
@@ -77,7 +78,7 @@ sentMessagesRouter.get('/:id', async (req, res, next) => {
 //     }
 // });
 
-sentMessagesRouter.get('/messages/:id', async (req, res, next) => {
+sentMessagesRouter.get('/messages/:id',  authenticateToken, async (req, res, next) => {
     try {
         let id = req.params.id;
         let result = await sentMessagesDbOperations.getMessageById(id);
@@ -89,7 +90,7 @@ sentMessagesRouter.get('/messages/:id', async (req, res, next) => {
 });
 
 //To be updated
-sentMessagesRouter.put('/:id', async (req, res, next) => {
+sentMessagesRouter.put('/:id', authenticateToken,  async (req, res, next) => {
     try {
       let id = req.params.id;
       let updatedValues = req.body;
@@ -106,7 +107,7 @@ sentMessagesRouter.put('/:id', async (req, res, next) => {
     }
   });
 
-sentMessagesRouter.delete('/:id', async (req, res, next) => {
+sentMessagesRouter.delete('/:id', authenticateToken,  async (req, res, next) => {
     try {
         let id = req.params.id;
         let result = await sentMessagesDbOperations.deleteMessage(id);

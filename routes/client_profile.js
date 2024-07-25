@@ -1,8 +1,9 @@
 const express = require('express');
 const clientRouter = express.Router();
 const clientDbOperations = require('../cruds/client_profile');
+const authenticateToken = require('../utilities/authenticateToken'); 
 
-clientRouter.post('/', async (req, res, next) => {
+clientRouter.post('/', authenticateToken, async (req, res, next) => {
     try {
         let postedValues = req.body;
         let account_type = postedValues.account_type;
@@ -28,7 +29,7 @@ clientRouter.post('/', async (req, res, next) => {
     }
 })
 
-clientRouter.get('/', async (req, res, next) => {
+clientRouter.get('/', authenticateToken, async (req, res, next) => {
     try {
         let results = await clientDbOperations.getClients();
         res.json(results);
@@ -38,7 +39,7 @@ clientRouter.get('/', async (req, res, next) => {
     }
 });
 
-clientRouter.get('/:id', async (req, res, next) => {
+clientRouter.get('/:id', authenticateToken,  async (req, res, next) => {
     try {
         let userId = req.params.id;
         let result = await clientDbOperations.getClientById(userId);
@@ -50,7 +51,7 @@ clientRouter.get('/:id', async (req, res, next) => {
 });
 
 //Get client profile id by email
-clientRouter.get('/clientid/:email', async (req, res, next) => {
+clientRouter.get('/clientid/:email', authenticateToken,  async (req, res, next) => {
     try {
         let email = req.params.email;
         let result = await clientDbOperations.getClientIDByEmail(email);
@@ -74,7 +75,7 @@ clientRouter.get('/api/:id/:key', async (req, res, next) => {
     }
 });
 
-clientRouter.put('/:id', async (req, res, next) => {
+clientRouter.put('/:id', authenticateToken,  async (req, res, next) => {
     try {
         let client_profile_id = req.params.id;
         let postedValues = req.body;
@@ -102,7 +103,7 @@ clientRouter.put('/:id', async (req, res, next) => {
     }
 });
 
-clientRouter.put('/configapi/:id', async (req, res, next) => {
+clientRouter.put('/configapi/:id', authenticateToken,  async (req, res, next) => {
     try {
         let client_profile_id = req.params.id;
         let postedValues = req.body;
@@ -119,7 +120,7 @@ clientRouter.put('/configapi/:id', async (req, res, next) => {
     }
 });
 
-clientRouter.put('/updateapisatus/:id', async (req, res, next) => {
+clientRouter.put('/updateapisatus/:id', authenticateToken,  async (req, res, next) => {
     try {
         let client_profile_id = req.params.id;
         let postedValues = req.body;
@@ -135,7 +136,7 @@ clientRouter.put('/updateapisatus/:id', async (req, res, next) => {
     }
 });
 
-clientRouter.delete('/:id', async (req, res, next) => {
+clientRouter.delete('/:id', authenticateToken,  async (req, res, next) => {
     try {
         let id = req.params.id;
         let result = await clientDbOperations.deleteClient(id);
